@@ -1,0 +1,30 @@
+Example: Require Role
+ts
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { RolesGuard } from '../rbac/roles.guard';
+import { Roles } from '../rbac/roles.decorator';
+
+@Controller('admin')
+@UseGuards(RolesGuard)
+export class AdminController {
+  @Get()
+  @Roles('SUPER_ADMIN')
+  getAdminData() {
+    return { message: 'Only SUPER_ADMIN can access this' };
+  }
+}
+Example: Require Permission
+ts
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { RolesGuard } from '../rbac/roles.guard';
+import { Permissions } from '../rbac/permissions.decorator';
+
+@Controller('payroll')
+@UseGuards(RolesGuard)
+export class PayrollController {
+  @Get()
+  @Permissions('VIEW_PAYROLL')
+  getPayrollData() {
+    return { message: 'Only users with VIEW_PAYROLL permission can access this' };
+  }
+}

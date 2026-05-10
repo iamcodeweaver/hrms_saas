@@ -1,0 +1,989 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum UserRoleType {
+  SUPER_ADMIN
+  HR
+  MANAGER
+  EMPLOYEE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  REJECTED
+  PAID
+}
+
+enum WalletTxnType {
+  CREDIT
+  DEBIT
+}
+
+enum WalletTxnStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  INTERVIEW
+  OFFERED
+  HIRED
+  REJECTED
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSED
+  PAID
+}
+
+enum ShiftType {
+  MORNING
+  AFTERNOON
+  NIGHT
+  FLEX
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum PayrollItemType {
+  EARNING
+  DEDUCTION
+  BONUS
+  TAX
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  TEMPORARY
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  TERMINATED
+  SUSPENDED
+  RESIGNED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+//////////////////////////////////////////////////////
+// TENANT CORE
+//////////////////////////////////////////////////////
+
+model Company {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  timezone String @default("Africa/Lagos")
+  currency String @default("NGN")
+  locale   String @default("en")
+
+  users       User[]
+  employees   Employee[]
+  branches    Branch[]
+  departments Department[]
+  positions   Position[]
+  wallets     Wallet[]
+  roles       Role[]
+  shifts      Shift[]
+
+  recruitmentStages RecruitmentStage[]
+  payrollRuns       PayrollRun[]
+  leaveTypes        LeaveType[]
+  biometricDevices  BiometricDevice[]
+  settings          CompanySetting?
+
+  auditLogs DomainAuditLog[]
+  events    DomainEvent[]
+
+  subscriptions Subscription[]
+
+  // ADD THESE
+  walletTransactions  WalletTransaction[]
+  leaveRequests       LeaveRequest[]
+  applicants          Applicant[]
+  jobPositions        JobPosition[]
+  jobApplications     JobApplication[]
+  payrolls            Payroll[]
+  attendanceLogs      AttendanceLog[]
+  attendanceSummaries AttendanceSummary[]
+  files               File[]
+  loans               Loan[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//////////////////////////////////////////////////////
+// USERS + RBAC
+//////////////////////////////////////////////////////
+
+model User {
+  id       String  @id @default(uuid())
+  email    String
+  password String
+  isActive Boolean @default(true)
+
+  emailVerifiedAt DateTime?
+
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  passwordChangedAt   DateTime?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employee Employee?
+
+  roles UserRoleMap[]
+
+  approvedLeaves LeaveRequest[] // NEW
+
+  refreshTokens RefreshToken[]
+  auditLogs     DomainAuditLog[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, email])
+}
+
+model Role {
+  id   String @id @default(uuid())
+  name String
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  users       UserRoleMap[]
+  permissions RolePermission[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+}
+
+model Permission {
+  id  String @id @default(uuid())
+  key String @unique
+
+  roles RolePermission[]
+
+  createdAt DateTime @default(now())
+}
+
+model RolePermission {
+  id String @id @default(uuid())
+
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRoleMap {
+  id String @id @default(uuid())
+
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model RefreshToken {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////////////////////////////////////
+// ORGANIZATION
+//////////////////////////////////////////////////////
+
+model Branch {
+  id      String  @id @default(uuid())
+  name    String
+  address String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employees Employee[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id   String @id @default(uuid())
+  name String
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employees Employee[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  @@unique([companyId, name])
+}
+
+model Position {
+  id    String @id @default(uuid())
+  title String
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employees Employee[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+}
+
+//////////////////////////////////////////////////////
+// EMPLOYEE
+//////////////////////////////////////////////////////
+
+model Employee {
+  id         String @id @default(uuid())
+  employeeNo String
+
+  firstName  String
+  middleName String?
+  lastName   String
+
+  email String?
+  phone String?
+
+  gender        String?
+  maritalStatus String?
+  dateOfBirth   DateTime?
+
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  postalCode String?
+
+  photoUrl String?
+
+  hireDate        DateTime?
+  terminationDate DateTime?
+
+  employmentType   EmploymentType?
+  employmentStatus EmploymentStatus?
+
+  salary   Decimal? @db.Decimal(18, 2)
+  currency String?  @default("NGN")
+
+  emergencyContactName  String?
+  emergencyContactPhone String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  branchId     String?
+  departmentId String?
+  positionId   String?
+
+  branch     Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  position   Position?   @relation(fields: [positionId], references: [id], onDelete: SetNull)
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  wallet Wallet?
+
+  shiftAssignments EmployeeShift[]
+
+  attendance          AttendanceLog[]
+  attendanceSummaries AttendanceSummary[]
+
+  leaveRequests LeaveRequest[]
+  loans         Loan[]
+  payrolls      Payroll[]
+
+  documents         File[]
+  employeeDocuments EmployeeDocument[]
+  notifications     Notification[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, employeeNo])
+  @@index([companyId])
+  @@index([companyId, employmentStatus])
+  @@index([companyId, departmentId])
+  @@index([companyId, branchId])
+  @@index([companyId, positionId])
+}
+
+//////////////////////////////////////////////////////
+// WALLET
+//////////////////////////////////////////////////////
+
+model Wallet {
+  id String @id @default(uuid())
+
+  employeeId String   @unique
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  balance Decimal @default(0) @db.Decimal(18, 2)
+
+  transactions WalletTransaction[]
+  ledger       WalletLedger[]
+
+  createdAt DateTime @default(now())
+}
+
+model WalletTransaction {
+  id       String @id @default(uuid())
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type   WalletTxnType
+  amount Decimal       @db.Decimal(18, 2)
+
+  reference String?         @unique
+  status    WalletTxnStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  ledgerEntries WalletLedger[] // NEW
+
+  @@index([walletId, createdAt])
+  @@index([companyId, walletId])
+  @@index([companyId, status])
+}
+
+model WalletLedger {
+  id String @id @default(uuid())
+
+  companyId String
+
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  transactionId String?
+  transaction   WalletTransaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  debit  Decimal @db.Decimal(18, 2)
+  credit Decimal @db.Decimal(18, 2)
+
+  balanceBefore Decimal @default(0) @db.Decimal(18, 2)
+  balanceAfter  Decimal @db.Decimal(18, 2)
+
+  reference String?
+  narration String?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([walletId, createdAt])
+}
+
+//////////////////////////////////////////////////////
+// LEAVE
+//////////////////////////////////////////////////////
+
+model LeaveRequest {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  approvedById String?
+  approvedBy   User?   @relation(fields: [approvedById], references: [id], onDelete: SetNull)
+
+  status LeaveStatus
+
+  leaveTypeId String?
+  leaveType   LeaveType? @relation(fields: [leaveTypeId], references: [id], onDelete: SetNull) // NEW
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model LeaveType {
+  id   String @id @default(uuid())
+  name String
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  requests LeaveRequest[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////////////////////////////////////
+// ATS
+//////////////////////////////////////////////////////
+
+model Applicant {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName  String
+
+  email String
+  phone String?
+
+  resumeUrl    String?
+  linkedinUrl  String?
+  portfolioUrl String?
+
+  applications JobApplication[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+model JobPosition {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+
+  isPublished Boolean   @default(false)
+  expiresAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  applications JobApplication[]
+
+  @@index([companyId])
+}
+
+model JobApplication {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  applicantId String
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  jobId String
+  job   JobPosition @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  status ApplicationStatus
+
+  stageHistory ApplicationStageHistory[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, applicantId, jobId])
+  @@index([companyId, jobId])
+  @@index([companyId, status])
+}
+
+model ApplicationStageHistory {
+  id String @id @default(uuid())
+
+  companyId String
+
+  applicationId String
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  stageId String?
+  stage   RecruitmentStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  movedAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([applicationId])
+}
+
+model RecruitmentStage {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name  String
+  order Int
+
+  stageHistories ApplicationStageHistory[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, order])
+  @@index([companyId])
+}
+
+//////////////////////////////////////////////////////
+// SUBSCRIPTION
+//////////////////////////////////////////////////////
+
+model Subscription {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  startsAt DateTime
+  endsAt   DateTime?
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model SubscriptionPlan {
+  id String @id @default(uuid())
+
+  name  String
+  price Decimal @db.Decimal(18, 2)
+
+  maxEmployees Int?
+
+  subscriptions Subscription[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////////////////////////////////////
+// DEVICES & SETTINGS
+//////////////////////////////////////////////////////
+
+model BiometricDevice {
+  id String @id @default(uuid())
+
+  name      String
+  serialNo  String @unique
+  ipAddress String
+  port      Int
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model CompanySetting {
+  id String @id @default(uuid())
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  payrollEnabled   Boolean @default(true)
+  biometricEnabled Boolean @default(true)
+  walletEnabled    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//////////////////////////////////////////////////////
+// AUDIT & EVENTS
+//////////////////////////////////////////////////////
+
+model DomainAuditLog {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  entityType String
+  entityId   String
+  action     String
+
+  before Json?
+  after  Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model DomainEvent {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  type    String
+  payload Json
+
+  processed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+//////////////////////////////////////////////////////
+// PAYROLL
+//////////////////////////////////////////////////////
+
+model PayrollRun {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  status PayrollStatus @default(DRAFT)
+
+  payrolls Payroll[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, status])
+}
+
+model Payroll {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  runId String
+  run   PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  grossPay Decimal @db.Decimal(18, 2)
+  netPay   Decimal @db.Decimal(18, 2)
+  currency String  @default("NGN")
+
+  items PayrollItem[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([companyId, employeeId])
+}
+
+model PayrollItem {
+  id String @id @default(uuid())
+
+  payrollId String
+  payroll   Payroll @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  type        PayrollItemType
+  description String?
+  amount      Decimal         @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////////////////////////////////////
+// SHIFT MANAGEMENT
+//////////////////////////////////////////////////////
+
+model Shift {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name      String
+  type      ShiftType
+  startTime DateTime
+  endTime   DateTime
+
+  assignments EmployeeShift[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model EmployeeShift {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  @@index([employeeId])
+  @@index([shiftId])
+}
+
+//////////////////////////////////////////////////////
+// ATTENDANCE
+//////////////////////////////////////////////////////
+
+model AttendanceLog {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  status    AttendanceStatus
+  timestamp DateTime         @default(now())
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  @@index([companyId])
+  @@index([employeeId])
+}
+
+model AttendanceSummary {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  totalPresent Int @default(0)
+  totalAbsent  Int @default(0)
+  totalLate    Int @default(0)
+  totalHalfDay Int @default(0)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  @@index([companyId])
+  @@index([employeeId])
+}
+
+//////////////////////////////////////////////////////
+// NOTIFICATIONS
+//////////////////////////////////////////////////////
+
+model Notification {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type    NotificationType
+  message String
+  read    Boolean          @default(false)
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////////////////////////////////////
+// FILES & DOCUMENTS
+//////////////////////////////////////////////////////
+
+model File {
+  id String @id @default(uuid())
+
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  employeeDocuments EmployeeDocument[] // NEW
+
+  name String
+  url  String
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model EmployeeDocument {
+  id String @id @default(uuid())
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  description String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model Loan {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  amount Decimal    @db.Decimal(18, 2)
+  status LoanStatus @default(PENDING)
+
+  issuedAt DateTime  @default(now())
+  dueDate  DateTime?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([employeeId])
+}
