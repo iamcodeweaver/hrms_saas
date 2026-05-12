@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { Providers } from "./providers";
 import ThemeRegistry from "./ThemeRegistry";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
 const inter = Inter({
   subsets: ["latin"],

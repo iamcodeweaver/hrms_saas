@@ -166,8 +166,8 @@ export default function LeavePage() {
                 </MenuItem>
               ))}
             </TextField>
-            <TextField type="date" fullWidth label="Start Date" InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
-            <TextField type="date" fullWidth label="End Date" InputLabelProps={{ shrink: true }} />
+            <TextField type="date" fullWidth label="Start Date" slotProps={{ inputLabel: { shrink: true } }} sx={{ mb: 2 }} />
+            <TextField type="date" fullWidth label="End Date" slotProps={{ inputLabel: { shrink: true } }} />
           </Box>
         </DialogContent>
         <DialogActions>

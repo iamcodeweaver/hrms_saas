@@ -180,8 +180,8 @@ export default function PayrollPage() {
         <DialogTitle>Create Payroll Run</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField type="date" label="Period Start" InputLabelProps={{ shrink: true }} fullWidth />
-            <TextField type="date" label="Period End" InputLabelProps={{ shrink: true }} fullWidth />
+            <TextField type="date" label="Period Start" slotProps={{ inputLabel: { shrink: true } }} fullWidth />
+            <TextField type="date" label="Period End" slotProps={{ inputLabel: { shrink: true } }} fullWidth />
           </Box>
         </DialogContent>
         <DialogActions>

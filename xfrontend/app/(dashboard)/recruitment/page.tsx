@@ -262,7 +262,7 @@ export default function RecruitmentPage() {
             <TextField
               type="date"
               label="Expiry Date"
-              InputLabelProps={{ shrink: true }}
+              slotProps={{ inputLabel: { shrink: true } }}
               fullWidth
             />
           </Box>
